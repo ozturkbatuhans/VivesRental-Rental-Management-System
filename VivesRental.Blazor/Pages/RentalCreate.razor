@@ -1,0 +1,340 @@
+﻿@page "/rentals/new"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+@using VivesRental.Blazor.Models
+@inject VivesRental.Blazor.Services.CustomerService CustomerService
+@inject VivesRental.Blazor.Services.ProductService ProductService
+@inject VivesRental.Blazor.Services.OrderService OrderService
+@inject VivesRental.Blazor.Services.OrderLineService OrderLineService
+@inject VivesRental.Blazor.Services.TimeService TimeService
+@inject NavigationManager Nav
+
+<h1>New rental order</h1>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+@if (loading)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">1) Choose customer</h5>
+
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-8">
+                    <label class="form-label">Customer</label>
+
+                    <select class="form-select"
+                            value="@selectedCustomerId"
+                            @onchange="OnCustomerChanged"
+                            disabled="@orderCreated">
+                        <option value="@Guid.Empty">-- Select customer --</option>
+                        @foreach (var c in customers)
+                        {
+                            <option value="@c.Id">@c.FirstName @c.LastName (@c.Email)</option>
+                        }
+                    </select>
+
+                    @if (IsCustomerSelected)
+                    {
+                        <div class="text-muted small mt-1">Selected: @selectedCustomerId</div>
+                    }
+                </div>
+
+                <div class="col-12 col-md-4 text-md-end">
+                    <button class="btn btn-primary"
+                            @onclick="CreateOrder"
+                            disabled="@(orderCreated || !IsCustomerSelected || creatingOrder)">
+                        @(creatingOrder ? "Creating..." : "Create order")
+                    </button>
+                </div>
+            </div>
+
+            @if (orderCreated)
+            {
+                <div class="mt-3">
+                    <div class="text-muted">Order created:</div>
+                    <div class="fw-bold">@orderId</div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">2) Add products (only available)</h5>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="ReloadProducts" disabled="@loadingProducts">
+                    Refresh
+                </button>
+            </div>
+
+            @if (loadingProducts)
+            {
+                <p class="mt-2"><em>Loading products...</em></p>
+            }
+            else if (availableProducts.Count == 0)
+            {
+                <p class="mt-2">No available products.</p>
+            }
+            else
+            {
+                <table class="table table-striped align-middle mt-2">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Manufacturer</th>
+                            <th>Available now</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in availableProducts)
+                        {
+                            <tr>
+                                <td>@p.Name</td>
+                                <td>@p.Manufacturer</td>
+                                <td>@p.Available</td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-primary"
+                                            @onclick="() => AddProduct(p.Id)"
+                                            disabled="@(orderId == Guid.Empty || addingProductId == p.Id)">
+                                        @(addingProductId == p.Id ? "Adding..." : "Add")
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                @if (orderId == Guid.Empty)
+                {
+                    <div class="alert alert-info mt-2 mb-0">
+                        Create an order first before adding products.
+                    </div>
+                }
+            }
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">3) Current order lines</h5>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="ReloadLines" disabled="@loadingLines">
+                    Refresh
+                </button>
+            </div>
+
+            @if (loadingLines)
+            {
+                <p class="mt-2"><em>Loading order lines...</em></p>
+            }
+            else if (lines.Count == 0)
+            {
+                <p class="mt-2">No lines yet. Add a product.</p>
+            }
+            else
+            {
+                <table class="table table-striped align-middle mt-2">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Rented</th>
+                            <th>Expires</th>
+                            <th>Returned</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var l in lines)
+                        {
+                            <tr>
+                                <td>@l.ProductName</td>
+                                <td>@l.RentedAt.ToLocalTime().ToString("dd-MM-yyyy HH:mm")</td>
+                                <td>@l.ExpiresAt.ToLocalTime().ToString("dd-MM-yyyy HH:mm")</td>
+                                <td>@(l.ReturnedAt.HasValue? l.ReturnedAt.Value.ToLocalTime().ToString("dd-MM-yyyy HH:mm") : "-")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            <div class="mt-3 text-end">
+                <button class="btn btn-success"
+                        @onclick="GoToOrderDetail"
+                        disabled="@(orderId == Guid.Empty || lines.Count == 0)">
+                    Finish and open order
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool loading = true;
+    private string? error;
+
+    private List<CustomerDto> customers = new();
+
+    private Guid selectedCustomerId = Guid.Empty;
+    private bool IsCustomerSelected => selectedCustomerId != Guid.Empty;
+
+    private bool creatingOrder;
+    private bool orderCreated;
+    private Guid orderId = Guid.Empty;
+
+    private bool loadingProducts;
+    private List<ProductDto> availableProducts = new();
+    private Guid? addingProductId;
+
+    private bool loadingLines;
+    private List<OrderLineDto> lines = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCustomers();
+    }
+
+    private void OnCustomerChanged(ChangeEventArgs e)
+    {
+        if (e.Value is string strValue && Guid.TryParse(strValue, out var parsedGuid))
+        {
+            selectedCustomerId = parsedGuid;
+        }
+    }
+
+    private async Task LoadCustomers()
+    {
+        loading = true;
+        error = null;
+
+        try
+        {
+            customers = await CustomerService.GetCustomersAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task CreateOrder()
+    {
+        error = null;
+        creatingOrder = true;
+
+        try
+        {
+            var created = await OrderService.CreateOrderAsync(selectedCustomerId);
+            if (created == null)
+            {
+                error = "Unable to create order.";
+                return;
+            }
+
+            orderId = created.Id;
+            orderCreated = true;
+
+            await ReloadProducts();
+            await ReloadLines();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            creatingOrder = false;
+        }
+    }
+
+    private async Task ReloadProducts()
+    {
+        loadingProducts = true;
+        error = null;
+
+        try
+        {
+            var now = await TimeService.GetUtcNowAsync();
+            var all = await ProductService.GetProductsAsync(now);
+            availableProducts = all.Where(p => p.Available > 0).ToList();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            availableProducts = new List<ProductDto>();
+        }
+        finally
+        {
+            loadingProducts = false;
+        }
+    }
+
+    private async Task AddProduct(Guid productId)
+    {
+        if (orderId == Guid.Empty)
+            return;
+
+        error = null;
+        addingProductId = productId;
+
+        try
+        {
+            await OrderLineService.RentByProductAsync(orderId, productId);
+            await ReloadProducts();
+            await ReloadLines();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            addingProductId = null;
+        }
+    }
+
+    private async Task ReloadLines()
+    {
+        if (orderId == Guid.Empty)
+        {
+            lines = new List<OrderLineDto>();
+            return;
+        }
+
+        loadingLines = true;
+        error = null;
+
+        try
+        {
+            lines = await OrderLineService.GetOrderLinesByOrderIdAsync(orderId);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            lines = new List<OrderLineDto>();
+        }
+        finally
+        {
+            loadingLines = false;
+        }
+    }
+
+    private void GoToOrderDetail()
+    {
+        if (orderId == Guid.Empty || lines.Count == 0)
+            return;
+
+        Nav.NavigateTo($"/orders/{orderId}");
+    }
+}

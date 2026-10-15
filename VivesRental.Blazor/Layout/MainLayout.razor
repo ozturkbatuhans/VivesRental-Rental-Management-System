@@ -1,0 +1,46 @@
+﻿@inherits LayoutComponentBase
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="content px-4">
+            <ErrorBoundary @ref="_errorBoundary">
+                <ChildContent>
+                    @Body
+                </ChildContent>
+                <ErrorContent>
+                    <div class="alert alert-danger mt-5 shadow-sm" role="alert">
+                        <h4 class="alert-heading">
+                            <span class="oi oi-warning" aria-hidden="true"></span> Connection Error
+                        </h4>
+                        <p>
+                            An unexpected error occurred while processing your request.
+                            The API server might be unreachable or there is a network issue.
+                        </p>
+                        <hr>
+                        <button class="btn btn-danger" @onclick="Recover">
+                            Retry
+                        </button>
+                    </div>
+                </ErrorContent>
+            </ErrorBoundary>
+        </div>
+    </main>
+</div>
+
+@code {
+    private ErrorBoundary? _errorBoundary;
+
+    private void Recover()
+    {
+        _errorBoundary?.Recover();
+    }
+
+    protected override void OnParametersSet()
+    {
+        _errorBoundary?.Recover();
+    }
+}

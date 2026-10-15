@@ -1,0 +1,105 @@
+﻿@page "/products/new"
+@attribute [Authorize]
+
+@using System.ComponentModel.DataAnnotations
+@using VivesRental.Blazor.Models
+@inject VivesRental.Blazor.Services.ProductService ProductService
+@inject NavigationManager Nav
+
+<h1>New product</h1>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+<EditForm Model="model" OnValidSubmit="Create">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="mb-3">
+        <label class="form-label">Name</label>
+        <InputText class="form-control" @bind-Value="model.Name" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Description</label>
+        <InputTextArea class="form-control" @bind-Value="model.Description" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Manufacturer</label>
+        <InputText class="form-control" @bind-Value="model.Manufacturer" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Publisher</label>
+        <InputText class="form-control" @bind-Value="model.Publisher" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Rental expires after (days)</label>
+        <InputNumber class="form-control" @bind-Value="model.RentalExpiresAfterDays" />
+    </div>
+
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit" disabled="@saving">Create</button>
+        <button class="btn btn-secondary" type="button" @onclick="Cancel" disabled="@saving">Cancel</button>
+    </div>
+</EditForm>
+
+@code {
+    private bool saving;
+    private string? error;
+
+    private ProductCreateModel model = new();
+
+    private async Task Create()
+    {
+        saving = true;
+        error = null;
+
+        try
+        {
+            var created = await ProductService.CreateProductAsync(new ProductCreateRequest
+            {
+                Name = model.Name!,
+                Description = model.Description,
+                Manufacturer = model.Manufacturer,
+                Publisher = model.Publisher,
+                RentalExpiresAfterDays = model.RentalExpiresAfterDays
+            });
+
+            Nav.NavigateTo($"/products/{created.Id}");
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        Nav.NavigateTo("/products");
+    }
+
+    private class ProductCreateModel
+    {
+        [Required]
+        [MinLength(2)]
+        public string? Name { get; set; }
+
+        public string? Description { get; set; }
+
+        public string? Manufacturer { get; set; }
+
+        public string? Publisher { get; set; }
+
+        [Range(1, 3650)]
+        public int RentalExpiresAfterDays { get; set; } = 1;
+    }
+}

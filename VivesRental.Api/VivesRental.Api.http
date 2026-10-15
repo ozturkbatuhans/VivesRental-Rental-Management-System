@@ -1,0 +1,15 @@
+@VivesRental.Api_HostAddress = https://localhost:7073
+
+### Login (returns a JWT)
+POST {{VivesRental.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "admin"
+}
+
+### Products (paste the token from the login response)
+GET {{VivesRental.Api_HostAddress}}/api/products
+Accept: application/json
+Authorization: Bearer <token>

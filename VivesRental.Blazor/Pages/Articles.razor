@@ -1,0 +1,207 @@
+﻿@page "/articles"
+
+@inject ArticleService ArticleService
+@inject ProductService ProductService
+
+<h3>Articles</h3>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row g-2 align-items-end">
+            <div class="col-12 col-md-6">
+                <label class="form-label">Filter by product</label>
+                <select class="form-select" @bind="selectedProductId">
+                    <option value="@Guid.Empty">All products</option>
+                    @foreach (var p in products)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </select>
+            </div>
+
+            <div class="col-12 col-md-auto">
+                <button class="btn btn-primary" @onclick="Load" disabled="@isLoading">
+                    @(isLoading ? "Loading..." : "Load")
+                </button>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(error))
+        {
+            <div class="alert alert-danger mt-2">@error</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(message))
+        {
+            <div class="alert alert-success mt-2">@message</div>
+        }
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <p>Loading...</p>
+}
+else if (articles.Count == 0)
+{
+    <p>No articles found.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Id</th>
+                    <th>ProductId</th>
+                    <th>Status</th>
+                    <th style="width: 260px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var a in articles)
+                {
+                    <tr>
+                        <td><code>@a.Id</code></td>
+                        <td><code>@a.ProductId</code></td>
+                        <td>
+                            <select class="form-select" @bind="a.Status" disabled="@isBusy">
+                                @foreach (var s in statusOptions)
+                                {
+                                    <option value="@s.Value">@s.Label</option>
+                                }
+                            </select>
+                            <small class="text-muted">Current: @GetStatusLabel(a.Status)</small>
+                        </td>
+                        <td>
+                            <button class="btn btn-outline-primary me-2" @onclick="() => SaveStatus(a)" disabled="@isBusy">
+                                Update status
+                            </button>
+                            <button class="btn btn-outline-danger" @onclick="() => Delete(a)" disabled="@isBusy">
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<ProductDto> products = new();
+    private List<ArticleDto> articles = new();
+
+    private Guid selectedProductId = Guid.Empty;
+
+    private bool isLoading;
+    private bool isBusy;
+
+    private string? error;
+    private string? message;
+
+    // Matches backend enum values:
+    // Normal=0, Broken=1, InRepair=2, Lost=3, Destroyed=4
+    // (VivesRental.Enums.ArticleStatus) :contentReference[oaicite:1]{index=1}
+    private readonly List<StatusOption> statusOptions = new()
+    {
+        new StatusOption(0, "Normal"),
+        new StatusOption(1, "Broken"),
+        new StatusOption(2, "InRepair"),
+        new StatusOption(3, "Lost"),
+        new StatusOption(4, "Destroyed"),
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProducts();
+        await Load();
+    }
+
+    private async Task LoadProducts()
+    {
+        try
+        {
+            products = await ProductService.GetProductsAsync();
+        }
+        catch
+        {
+            products = new List<ProductDto>();
+        }
+    }
+
+    private async Task Load()
+    {
+        isLoading = true;
+        error = null;
+        message = null;
+
+        try
+        {
+            var pid = selectedProductId == Guid.Empty ? (Guid?)null : selectedProductId;
+            articles = await ArticleService.GetArticlesAsync(pid);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            articles = new List<ArticleDto>();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveStatus(ArticleDto a)
+    {
+        isBusy = true;
+        error = null;
+        message = null;
+
+        try
+        {
+            // If your ArticleService.UpdateStatusAsync expects string, sending numeric value as string is safe.
+            // If it expects int, change this line to: await ArticleService.UpdateStatusAsync(a.Id, a.Status);
+            await ArticleService.UpdateStatusAsync(a.Id, a.Status.ToString());
+            message = "Status updated.";
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task Delete(ArticleDto a)
+    {
+        isBusy = true;
+        error = null;
+        message = null;
+
+        try
+        {
+            await ArticleService.DeleteAsync(a.Id);
+            articles.Remove(a);
+            message = "Article deleted.";
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private string GetStatusLabel(int statusValue)
+    {
+        var match = statusOptions.FirstOrDefault(x => x.Value == statusValue);
+        return match?.Label ?? statusValue.ToString();
+    }
+
+    private sealed record StatusOption(int Value, string Label);
+}

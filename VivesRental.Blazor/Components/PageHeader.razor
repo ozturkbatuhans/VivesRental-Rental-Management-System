@@ -1,0 +1,22 @@
+﻿<div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="page-title mb-1">@Title</h1>
+        @if (!string.IsNullOrWhiteSpace(Subtitle))
+        {
+            <div class="text-muted">@Subtitle</div>
+        }
+    </div>
+
+    @if (Actions is not null)
+    {
+        <div class="d-flex gap-2">
+            @Actions
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+}

@@ -1,0 +1,99 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@inject VivesRental.Blazor.Services.AuthService AuthService
+@inject NavigationManager Nav
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">VivesRental.Blazor</a>
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+<div class="nav-item px-3">
+    <NavLink class="nav-link" href="VivesRental">
+        <span class="oi oi-list-rich" aria-hidden="true"></span> API Test
+    </NavLink>
+</div>
+
+<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
+    <nav class="nav flex-column">
+        <AuthorizeView>
+            <NotAuthorized>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="login">
+                        <span class="oi oi-account-login" aria-hidden="true"></span> Login
+                    </NavLink>
+                </div>
+            </NotAuthorized>
+
+            <Authorized>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">
+                        <span class="oi oi-home" aria-hidden="true"></span> Dashboard
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="products">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> Products
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="articles">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> Articles
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="customers">
+                        <span class="oi oi-people" aria-hidden="true"></span> Customers
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="orders">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> Orders
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="rentals/new">
+                        <span class="oi oi-plus" aria-hidden="true"></span> New rental
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="reservations">
+                        <span class="oi oi-calendar" aria-hidden="true"></span> Reservations
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3 mt-2">
+                    <button class="btn btn-sm btn-outline-light w-100" @onclick="Logout">
+                        Logout
+                    </button>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+    </nav>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+
+    private async Task Logout()
+    {
+        await AuthService.LogoutAsync();
+        Nav.NavigateTo("/login", forceLoad: true);
+    }
+}

@@ -1,0 +1,141 @@
+﻿@page "/products"
+@attribute [Authorize]
+@using VivesRental.Blazor.Models
+@inject VivesRental.Blazor.Services.ProductService ProductService
+@inject NavigationManager Nav
+
+<h1>Products</h1>
+
+<div class="mb-3">
+    <button class="btn btn-primary" @onclick="GoNew">New product</button>
+</div>
+
+@if (loading)
+{
+    <p><em>Loading products...</em></p>
+}
+else if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger d-flex justify-content-between align-items-center">
+        <span>@error</span>
+        <button class="btn btn-sm btn-outline-light" @onclick="Load">Retry</button>
+    </div>
+}
+else if (products.Count == 0)
+{
+    <div class="alert alert-info">No products found.</div>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Manufacturer</th>
+                <th>Publisher</th>
+                <th class="text-end">Expires (days)</th>
+                <th class="text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in products)
+            {
+                <tr>
+                    <td>@p.Name</td>
+                    <td>@p.Manufacturer</td>
+                    <td>@p.Publisher</td>
+                    <td class="text-end">@p.RentalExpiresAfterDays</td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-outline-primary" href="@($"/products/{p.Id}")">Detail</a>
+                        <a class="btn btn-sm btn-outline-secondary ms-2" href="@($"/products/{p.Id}/edit")">Edit</a>
+                        <button class="btn btn-sm btn-outline-danger ms-2" @onclick="() => AskDelete(p)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (showDeleteConfirm && deleteTarget is not null)
+{
+    <div class="alert alert-warning d-flex justify-content-between align-items-center mt-3">
+        <span>Delete product "@deleteTarget.Name"?</span>
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-danger" @onclick="ConfirmDelete">Yes, delete</button>
+            <button class="btn btn-sm btn-secondary" @onclick="CancelDelete">Cancel</button>
+        </div>
+    </div>
+}
+
+@code {
+    private bool loading = true;
+    private string? error;
+    private List<ProductDto> products = new();
+
+    private ProductDto? deleteTarget;
+    private bool showDeleteConfirm;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        loading = true;
+        error = null;
+
+        try
+        {
+            products = await ProductService.GetProductsAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void AskDelete(ProductDto p)
+    {
+        deleteTarget = p;
+        showDeleteConfirm = true;
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteConfirm = false;
+        deleteTarget = null;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (deleteTarget is null) return;
+
+        try
+        {
+            var ok = await ProductService.DeleteProductAsync(deleteTarget.Id);
+            if (ok)
+            {
+                products.Remove(deleteTarget);
+            }
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            showDeleteConfirm = false;
+            deleteTarget = null;
+        }
+    }
+
+    private void GoNew()
+    {
+        Nav.NavigateTo("/products/new");
+    }
+}

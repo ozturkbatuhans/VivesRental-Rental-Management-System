@@ -1,0 +1,117 @@
+﻿@page "/orders"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+@using VivesRental.Blazor.Models
+@inject VivesRental.Blazor.Services.OrderService OrderService
+
+<h1>Orders</h1>
+
+@if (loading)
+{
+    <p><em>Loading orders...</em></p>
+}
+else if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger d-flex justify-content-between align-items-center">
+        <span>@error</span>
+        <button class="btn btn-sm btn-outline-light" @onclick="Load">Retry</button>
+    </div>
+}
+else
+{
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Order number</th>
+                <th>Customer</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th class="text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var o in orders)
+            {
+                <tr>
+                    <td class="text-monospace">@o.Id</td>
+                    <td>@o.CustomerFirstName @o.CustomerLastName</td>
+                    <td>@o.CreatedAt.ToLocalTime().ToString("dd-MM-yyyy HH:mm")</td>
+                    <td>
+                        @if (o.ReturnedAt.HasValue)
+                        {
+                            <span class="badge bg-success">Returned</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-warning text-dark">Active</span>
+                        }
+                    </td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-outline-primary me-2" href="/orders/@o.Id">Details</a>
+
+                        @if (!o.ReturnedAt.HasValue)
+                        {
+                            <button class="btn btn-sm btn-outline-danger"
+                                    @onclick="() => ReturnFullOrder(o.Id)"
+                                    disabled="@(isProcessing || o.NumberOfOrderLines == 0)">
+                                Return All
+                            </button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private bool loading = true;
+    private bool isProcessing;
+    private string? error;
+    private List<OrderDto> orders = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        loading = true;
+        error = null;
+
+        try
+        {
+            orders = await OrderService.GetOrdersAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            orders = new();
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task ReturnFullOrder(Guid id)
+    {
+        error = null;
+        isProcessing = true;
+
+        try
+        {
+            await OrderService.ReturnOrderAsync(id, DateTime.UtcNow);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+}

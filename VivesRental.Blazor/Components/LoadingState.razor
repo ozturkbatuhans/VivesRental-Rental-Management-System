@@ -1,0 +1,8 @@
+﻿<div class="d-flex align-items-center gap-2 py-3">
+    <div class="spinner-border" role="status" aria-hidden="true"></div>
+    <div class="text-muted">@Message</div>
+</div>
+
+@code {
+    [Parameter] public string Message { get; set; } = "Loading...";
+}

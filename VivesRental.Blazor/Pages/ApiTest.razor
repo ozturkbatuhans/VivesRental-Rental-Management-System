@@ -1,0 +1,36 @@
+﻿@page "/api-test"
+@inject HttpClient Http
+
+<h3>API Test</h3>
+
+<button class="btn btn-primary" @onclick="LoadProducts">Load Products</button>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="alert alert-danger mt-3">@Error</div>
+}
+
+@if (RawJson is not null)
+{
+    <pre class="mt-3">@RawJson</pre>
+}
+
+@code {
+    private string? RawJson;
+    private string Error = "";
+
+    private async Task LoadProducts()
+    {
+        Error = "";
+        RawJson = null;
+
+        try
+        {
+            RawJson = await Http.GetStringAsync("api/Products");
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+        }
+    }
+}

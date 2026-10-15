@@ -1,0 +1,171 @@
+﻿@page "/"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+@inject NavigationManager Nav
+@inject VivesRental.Blazor.Services.OrderService OrderService
+
+<h1>Rental dashboard</h1>
+
+<div class="row g-3">
+    <div class="col-12 col-lg-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">New rental order</h5>
+                <p class="card-text">Start a new rental order and add products that still have available items.</p>
+                <button class="btn btn-primary" @onclick="GoNewRental">Start new rental</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Return material</h5>
+                <p class="card-text">Enter an order number to open the order detail immediately.</p>
+
+                @if (!string.IsNullOrWhiteSpace(orderOpenError))
+                {
+                    <div class="alert alert-danger">@orderOpenError</div>
+                }
+
+                <div class="input-group">
+                    <input class="form-control"
+                           placeholder="Order id (GUID)"
+                           value="@orderIdText"
+                           @oninput="OnOrderIdInput"
+                           @onkeydown="OnOrderIdKeyDown"
+                           autofocus />
+
+                    <button class="btn btn-outline-primary"
+                            type="button"
+                            @onclick="OpenOrder"
+                            disabled="@processingOpenOrder">
+                        Open
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="card-title mb-1">Orders</h5>
+                    <div class="text-muted">View existing orders and return items.</div>
+                </div>
+                <a class="btn btn-outline-primary" href="/orders">Open orders</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="card-title mb-1">Articles</h5>
+                    <div class="text-muted">Manage articles (physical items).</div>
+                </div>
+                <a class="btn btn-outline-primary" href="/articles">Open articles</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="card-title mb-1">Products</h5>
+                    <div class="text-muted">Manage products (types).</div>
+                </div>
+                <a class="btn btn-outline-primary" href="/products">Open products</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="card-title mb-1">Customers</h5>
+                    <div class="text-muted">Manage customers.</div>
+                </div>
+                <a class="btn btn-outline-primary" href="/customers">Open customers</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="card-title mb-1">Reservations</h5>
+                    <div class="text-muted">Create and manage reservations.</div>
+                </div>
+                <a class="btn btn-outline-primary" href="/reservations">Open reservations</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string orderIdText = "";
+    private string? orderOpenError;
+    private bool processingOpenOrder;
+
+    private void GoNewRental()
+    {
+        Nav.NavigateTo("/rentals/new");
+    }
+
+    private void OnOrderIdInput(ChangeEventArgs e)
+    {
+        orderIdText = e.Value?.ToString() ?? "";
+        orderOpenError = null;
+    }
+
+    private async Task OnOrderIdKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await OpenOrder();
+        }
+    }
+
+    private async Task OpenOrder()
+    {
+        orderOpenError = null;
+
+        if (string.IsNullOrWhiteSpace(orderIdText))
+        {
+            orderOpenError = "Please enter an order id.";
+            return;
+        }
+
+        if (!Guid.TryParse(orderIdText.Trim(), out var id) || id == Guid.Empty)
+        {
+            orderOpenError = "Invalid order id format.";
+            return;
+        }
+
+        processingOpenOrder = true;
+
+        try
+        {
+            _ = await OrderService.GetOrderAsync(id);
+            Nav.NavigateTo($"/orders/{id}");
+        }
+        catch (HttpRequestException)
+        {
+            orderOpenError = "Order not found.";
+        }
+        catch (Exception ex)
+        {
+            orderOpenError = ex.Message;
+        }
+        finally
+        {
+            processingOpenOrder = false;
+        }
+    }
+}

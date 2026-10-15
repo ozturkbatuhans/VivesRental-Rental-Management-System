@@ -1,0 +1,235 @@
+﻿@page "/orders/{Id:guid}"
+@using VivesRental.Blazor.Models
+@inject VivesRental.Blazor.Services.OrderService OrderService
+@inject VivesRental.Blazor.Services.OrderLineService OrderLineService
+@inject NavigationManager Nav
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Order detail</h1>
+    <div>
+        @if (order != null && !order.ReturnedAt.HasValue)
+        {
+            <button class="btn btn-danger me-2"
+                    @onclick="ReturnAll"
+                    disabled="@(processing || lines.Count == 0)">
+                Return Full Order
+            </button>
+        }
+        <a class="btn btn-outline-secondary" href="/orders">Back to orders</a>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+@if (loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (order is null)
+{
+    <div class="alert alert-warning">Order not found.</div>
+}
+else
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-12 col-md-6">
+                    <h5>Customer</h5>
+                    <div>@order.CustomerFirstName @order.CustomerLastName</div>
+                    <div class="text-muted">@order.CustomerEmail</div>
+                </div>
+
+                <div class="col-12 col-md-6">
+                    <h5>Order</h5>
+                    <div>@order.Id</div>
+                    <div class="text-muted">Created: @order.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</div>
+                    <div>
+                        @if (order.ReturnedAt.HasValue)
+                        {
+                            <span class="badge bg-success">
+                                Returned on @order.ReturnedAt.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm")
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-warning text-dark">Active</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h2 class="h4 mb-0">Order lines</h2>
+        <button class="btn btn-sm btn-outline-secondary"
+                @onclick="ReloadLines"
+                disabled="@(processing)">
+            Refresh
+        </button>
+    </div>
+
+    @if (lines.Count == 0)
+    {
+        <div class="alert alert-info d-flex justify-content-between align-items-center">
+            <div>
+                <div class="fw-bold">No order lines yet.</div>
+                <div class="small">
+                    You can only add products while creating a new rental order.
+                    Start a new rental and add products there.
+                </div>
+            </div>
+            <div class="ms-3">
+                <button class="btn btn-primary"
+                        type="button"
+                        @onclick="GoToNewRental">
+                    Go to New rental
+                </button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Rented</th>
+                    <th>Expires</th>
+                    <th>Returned</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var l in lines)
+                {
+                    <tr>
+                        <td>@l.ProductName</td>
+                        <td>@FormatDate(l.RentedAt)</td>
+                        <td>@FormatDate(l.ExpiresAt)</td>
+                        <td>@FormatDate(l.ReturnedAt)</td>
+                        <td class="text-end">
+                            @if (!l.ReturnedAt.HasValue && !order.ReturnedAt.HasValue)
+                            {
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-danger"
+                                        disabled="@(processing || returningLineId == l.Id)"
+                                        @onclick="() => ReturnLine(l.Id)">
+                                    Return
+                                </button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private bool loading = true;
+    private bool processing;
+    private string? error;
+
+    private OrderDto? order;
+    private List<OrderLineDto> lines = new();
+
+    private Guid? returningLineId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        loading = true;
+        error = null;
+
+        try
+        {
+            order = await OrderService.GetOrderAsync(Id);
+            await ReloadLines();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            lines = new List<OrderLineDto>();
+        }
+        finally
+        {
+            loading = false;
+            processing = false;
+            returningLineId = null;
+        }
+    }
+
+    private async Task ReloadLines()
+    {
+        try
+        {
+            lines = await OrderLineService.GetOrderLinesByOrderIdAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            lines = new List<OrderLineDto>();
+        }
+    }
+
+    private async Task ReturnLine(Guid orderLineId)
+    {
+        error = null;
+        processing = true;
+        returningLineId = orderLineId;
+
+        try
+        {
+            await OrderLineService.ReturnOrderLineAsync(orderLineId, DateTime.UtcNow);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            processing = false;
+            returningLineId = null;
+        }
+    }
+
+    private async Task ReturnAll()
+    {
+        error = null;
+        processing = true;
+
+        try
+        {
+            await OrderService.ReturnOrderAsync(Id, DateTime.UtcNow);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            processing = false;
+        }
+    }
+
+    private void GoToNewRental()
+    {
+        Nav.NavigateTo("/rentals/new");
+    }
+
+    private static string FormatDate(DateTime dt) => dt.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+    private static string FormatDate(DateTime? dt) => dt.HasValue ? dt.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : "-";
+}

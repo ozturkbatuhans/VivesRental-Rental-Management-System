@@ -1,0 +1,200 @@
+﻿@page "/products/{Id:guid}"
+@attribute [Authorize]
+
+@using VivesRental.Blazor.Models
+@inject VivesRental.Blazor.Services.ProductService ProductService
+@inject VivesRental.Blazor.Services.ArticleService ArticleService
+@inject NavigationManager Nav
+
+<h1>Product detail</h1>
+
+@if (loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger d-flex justify-content-between align-items-center">
+        <span>@error</span>
+        <button class="btn btn-sm btn-outline-light" @onclick="Load">Retry</button>
+    </div>
+}
+else if (product is null)
+{
+    <div class="alert alert-warning">Product not found.</div>
+}
+else
+{
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <a class="btn btn-outline-secondary" href="@($"/products/{Id}/edit")">Edit</a>
+                <button class="btn btn-outline-danger" @onclick="AskDelete">Delete</button>
+                <button class="btn btn-outline-secondary" @onclick="GoBack">Back to products</button>
+            </div>
+
+            <hr />
+
+            <dl class="row mb-0">
+                <dt class="col-sm-4">Name</dt>
+                <dd class="col-sm-8">@product.Name</dd>
+
+                <dt class="col-sm-4">Description</dt>
+                <dd class="col-sm-8">@product.Description</dd>
+
+                <dt class="col-sm-4">Manufacturer</dt>
+                <dd class="col-sm-8">@product.Manufacturer</dd>
+
+                <dt class="col-sm-4">Publisher</dt>
+                <dd class="col-sm-8">@product.Publisher</dd>
+
+                <dt class="col-sm-4">Rental expires after (days)</dt>
+                <dd class="col-sm-8">@product.RentalExpiresAfterDays</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Generate articles</div>
+        <div class="card-body">
+            @if (!string.IsNullOrWhiteSpace(generateOk))
+            {
+                <div class="alert alert-success">@generateOk</div>
+            }
+            @if (!string.IsNullOrWhiteSpace(generateError))
+            {
+                <div class="alert alert-danger">@generateError</div>
+            }
+
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-4">
+                    <label class="form-label">Amount</label>
+                    <InputNumber class="form-control" @bind-Value="generateAmount" />
+                </div>
+                <div class="col-12 col-md-auto">
+                    <button class="btn btn-primary" disabled="@isGenerating" @onclick="Generate">Generate</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showDeleteConfirm)
+{
+    <div class="alert alert-warning d-flex justify-content-between align-items-center mt-3">
+        <span>Delete this product?</span>
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-danger" @onclick="ConfirmDelete">Yes, delete</button>
+            <button class="btn btn-sm btn-secondary" @onclick="CancelDelete">Cancel</button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private bool loading = true;
+    private string? error;
+    private ProductDto? product;
+
+    private bool showDeleteConfirm;
+
+    private int generateAmount = 1;
+    private bool isGenerating;
+    private string? generateError;
+    private string? generateOk;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        loading = true;
+        error = null;
+
+        try
+        {
+            product = await ProductService.GetByIdAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void AskDelete()
+    {
+        showDeleteConfirm = true;
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteConfirm = false;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        error = null;
+
+        try
+        {
+            var ok = await ProductService.DeleteProductAsync(Id);
+            if (ok)
+            {
+                Nav.NavigateTo("/products");
+            }
+            else
+            {
+                error = "Product not found.";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            showDeleteConfirm = false;
+        }
+    }
+
+    private async Task Generate()
+    {
+        generateError = null;
+        generateOk = null;
+
+        if (generateAmount < 1)
+        {
+            generateError = "Amount must be at least 1.";
+            return;
+        }
+
+        isGenerating = true;
+
+        try
+        {
+            await ArticleService.GenerateAsync(Id, generateAmount);
+            generateOk = "Articles generated.";
+        }
+        catch (Exception ex)
+        {
+            generateError = ex.Message;
+        }
+        finally
+        {
+            isGenerating = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        Nav.NavigateTo("/products");
+    }
+}

@@ -1,0 +1,156 @@
+﻿@page "/products/{Id:guid}/edit"
+@attribute [Authorize]
+
+@using System.ComponentModel.DataAnnotations
+@using VivesRental.Blazor.Models
+@inject VivesRental.Blazor.Services.ProductService ProductService
+@inject NavigationManager Nav
+
+<h1>Edit product</h1>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+@if (loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (model is null)
+{
+    <div class="alert alert-warning">Product not found.</div>
+}
+else
+{
+    <EditForm Model="model" OnValidSubmit="Save">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="mb-3">
+            <label class="form-label">Name</label>
+            <InputText class="form-control" @bind-Value="model.Name" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Description</label>
+            <InputTextArea class="form-control" @bind-Value="model.Description" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Manufacturer</label>
+            <InputText class="form-control" @bind-Value="model.Manufacturer" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Publisher</label>
+            <InputText class="form-control" @bind-Value="model.Publisher" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Rental expires after (days)</label>
+            <InputNumber class="form-control" @bind-Value="model.RentalExpiresAfterDays" />
+        </div>
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary" type="submit" disabled="@saving">Save</button>
+            <button class="btn btn-secondary" type="button" @onclick="Cancel" disabled="@saving">Cancel</button>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private bool loading = true;
+    private bool saving;
+    private string? error;
+
+    private ProductEditModel? model;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var p = await ProductService.GetByIdAsync(Id);
+            if (p is null)
+            {
+                model = null;
+                return;
+            }
+
+            model = new ProductEditModel
+            {
+                Name = p.Name,
+                Description = p.Description,
+                Manufacturer = p.Manufacturer,
+                Publisher = p.Publisher,
+                RentalExpiresAfterDays = p.RentalExpiresAfterDays
+            };
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task Save()
+    {
+        if (model is null) return;
+
+        saving = true;
+        error = null;
+
+        try
+        {
+            var updated = await ProductService.UpdateProductAsync(Id, new ProductCreateRequest
+            {
+                Name = model.Name!,
+                Description = model.Description,
+                Manufacturer = model.Manufacturer,
+                Publisher = model.Publisher,
+                RentalExpiresAfterDays = model.RentalExpiresAfterDays
+            });
+
+            if (updated is null)
+            {
+                error = "Product not found.";
+                return;
+            }
+
+            Nav.NavigateTo($"/products/{Id}");
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        Nav.NavigateTo($"/products/{Id}");
+    }
+
+    private class ProductEditModel
+    {
+        [Required]
+        [MinLength(2)]
+        public string? Name { get; set; }
+
+        public string? Description { get; set; }
+        public string? Manufacturer { get; set; }
+        public string? Publisher { get; set; }
+
+        [Range(1, 3650)]
+        public int RentalExpiresAfterDays { get; set; } = 1;
+    }
+}

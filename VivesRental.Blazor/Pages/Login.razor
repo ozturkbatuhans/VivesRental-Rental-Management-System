@@ -1,0 +1,71 @@
+﻿@page "/login"
+@using VivesRental.Blazor.Services
+@inject AuthService AuthService
+@inject NavigationManager Nav
+
+<h3>Login</h3>
+
+<div class="mb-3" style="max-width: 420px;">
+    <div class="mb-2">
+        <label class="form-label">Username</label>
+        <input class="form-control" @bind="username" />
+    </div>
+
+    <div class="mb-2">
+        <label class="form-label">Password</label>
+        <input class="form-control" type="password" @bind="password" />
+    </div>
+
+    <button class="btn btn-primary" @onclick="DoLogin" disabled="@isBusy">
+        @(isBusy ? "Logging in..." : "Login")
+    </button>
+
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="alert alert-danger mt-3">@error</div>
+    }
+
+    @if (success)
+    {
+        <div class="alert alert-success mt-3">Logged in.</div>
+    }
+</div>
+
+@code {
+    private string username = "";
+    private string password = "";
+    private bool isBusy;
+    private bool success;
+    private string? error;
+
+    private async Task DoLogin()
+    {
+        error = null;
+        success = false;
+        isBusy = true;
+
+        try
+        {
+            var ok = await AuthService.LoginAsync(username, password);
+
+            if (!ok)
+            {
+                error = "Invalid username or password.";
+                return;
+            }
+
+            success = true;
+
+            // Go to home
+            Nav.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+}

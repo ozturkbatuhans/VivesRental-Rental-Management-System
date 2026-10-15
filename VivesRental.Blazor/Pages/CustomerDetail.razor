@@ -1,0 +1,128 @@
+﻿@page "/customers/{Id:guid}"
+@attribute [Authorize]
+
+@using VivesRental.Blazor.Models
+@inject VivesRental.Blazor.Services.CustomerService CustomerService
+@inject NavigationManager Nav
+
+<h1>Customer detail</h1>
+
+<div class="mb-3">
+    <a class="btn btn-outline-secondary" href="@($"/customers/{Id}/edit")">Edit</a>
+    <button class="btn btn-outline-danger ms-2" @onclick="AskDelete">Delete</button>
+    <a class="btn btn-outline-secondary ms-2" href="/customers">Back to customers</a>
+</div>
+
+@if (loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger d-flex justify-content-between align-items-center">
+        <span>@error</span>
+        <button class="btn btn-sm btn-outline-light" @onclick="Load">Retry</button>
+    </div>
+}
+else if (customer is null)
+{
+    <div class="alert alert-warning">Customer not found.</div>
+}
+else
+{
+    <dl class="row">
+        <dt class="col-sm-3">First name</dt>
+        <dd class="col-sm-9">@customer.FirstName</dd>
+
+        <dt class="col-sm-3">Last name</dt>
+        <dd class="col-sm-9">@customer.LastName</dd>
+
+        <dt class="col-sm-3">Email</dt>
+        <dd class="col-sm-9">@customer.Email</dd>
+
+        <dt class="col-sm-3">Phone number</dt>
+        <dd class="col-sm-9">@customer.PhoneNumber</dd>
+    </dl>
+}
+
+@if (showDeleteConfirm)
+{
+    <div class="alert alert-warning d-flex justify-content-between align-items-center mt-3">
+        <span>Delete this customer?</span>
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-danger" @onclick="ConfirmDelete">Yes, delete</button>
+            <button class="btn btn-sm btn-secondary" @onclick="CancelDelete">Cancel</button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private bool loading = true;
+    private string? error;
+    private CustomerDto? customer;
+
+    private bool showDeleteConfirm;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        loading = true;
+        error = null;
+
+        try
+        {
+            customer = await CustomerService.GetCustomerAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void AskDelete()
+    {
+        showDeleteConfirm = true;
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteConfirm = false;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        error = null;
+
+        try
+        {
+            var ok = await CustomerService.DeleteCustomerAsync(Id);
+            if (ok)
+            {
+                Nav.NavigateTo("/customers");
+            }
+            else
+            {
+                error = "Customer not found.";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            showDeleteConfirm = false;
+        }
+    }
+}
